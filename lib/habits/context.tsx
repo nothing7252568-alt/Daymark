@@ -3,7 +3,7 @@ import { AppState, Platform } from "react-native";
 import { localDateKey } from "./dates";
 import { getReminderPermission, requestReminderPermission, syncReminderSchedules, type ReminderPermission } from "./notifications";
 import { readAppState, writeAppState } from "./storage";
-import { EMPTY_APP_STATE, type AppSettings, type Habit, type HabitDraft, type HabitStatus, type PersistedAppState } from "./types";
+import { EMPTY_APP_STATE, type AppSettings, type CustomReminderTone, type Habit, type HabitDraft, type HabitStatus, type PersistedAppState } from "./types";
 
 type StateChange = (previous: PersistedAppState) => PersistedAppState;
 interface HabitStoreValue {
@@ -24,6 +24,8 @@ interface HabitStoreValue {
   setHabitStatus: (id: string, status: HabitStatus) => Promise<boolean>;
   deleteHabit: (id: string) => Promise<boolean>;
   updateSettings: (settings: Partial<AppSettings>) => Promise<boolean>;
+  addCustomTone: (tone: CustomReminderTone) => Promise<boolean>;
+  removeCustomTone: (id: string) => Promise<boolean>;
   resetProgress: () => Promise<boolean>;
   clearError: () => void;
   exportJson: () => string;
@@ -130,7 +132,10 @@ export function HabitStoreProvider({ children }: { children: React.ReactNode }) 
       const next = pending.current;
       if (!next) {
         try {
-          if (notificationPermission === "granted") await syncReminderSchedules(stateRef.current.habits, stateRef.current.settings);
+          if (notificationPermission === "granted") {
+            const current = stateRef.current;
+            await syncReminderSchedules(current.habits, current.settings, current.customTones);
+          }
           setSaveError(null);
           return true;
         } catch {
@@ -167,10 +172,10 @@ export function HabitStoreProvider({ children }: { children: React.ReactNode }) 
 
   useEffect(() => {
     if (!hydrated || notificationPermission !== "granted") return;
-    void syncReminderSchedules(state.habits, state.settings).catch(() => {
+    void syncReminderSchedules(state.habits, state.settings, state.customTones).catch(() => {
       setSaveError("Your habits are saved, but reminder times couldn’t be updated.");
     });
-  }, [hydrated, notificationPermission, state.habits, state.settings]);
+  }, [hydrated, notificationPermission, state.habits, state.settings, state.customTones]);
 
   useEffect(() => {
     if (Platform.OS === "web" || !hydrated) return;
@@ -178,7 +183,10 @@ export function HabitStoreProvider({ children }: { children: React.ReactNode }) 
       if (nextState !== "active") return;
       void getReminderPermission().then(async (permission) => {
         setNotificationPermission(permission);
-        if (permission === "granted") await syncReminderSchedules(stateRef.current.habits, stateRef.current.settings);
+        if (permission === "granted") {
+          const current = stateRef.current;
+          await syncReminderSchedules(current.habits, current.settings, current.customTones);
+        }
       }).catch(() => setSaveError("Your reminder permission could not be checked. Open Settings to try again."));
     });
     return () => subscription.remove();
@@ -206,19 +214,35 @@ export function HabitStoreProvider({ children }: { children: React.ReactNode }) 
   })), [commit]);
   const deleteHabit = useCallback((id: string) => commit((previous) => ({ ...previous, habits: previous.habits.filter((habit) => habit.id !== id) })), [commit]);
   const updateSettings = useCallback((settings: Partial<AppSettings>) => commit((previous) => ({ ...previous, settings: { ...previous.settings, ...settings } })), [commit]);
+  const addCustomTone = useCallback((tone: CustomReminderTone) => commit((previous) => ({
+    ...previous,
+    customTones: [...previous.customTones.filter((item) => item.id !== tone.id), tone],
+    settings: { ...previous.settings, reminderToneId: tone.id },
+  })), [commit]);
+  const removeCustomTone = useCallback((id: string) => commit((previous) => ({
+    ...previous,
+    customTones: previous.customTones.filter((tone) => tone.id !== id),
+    settings: previous.settings.reminderToneId === id
+      ? { ...previous.settings, reminderToneId: "device-default" }
+      : previous.settings,
+  })), [commit]);
   const resetProgress = useCallback(() => commit((previous) => ({
     ...previous,
     habits: previous.habits.map((habit) => ({ ...habit, completedDates: [], updatedAt: new Date().toISOString() })),
   })), [commit]);
   const clearError = useCallback(() => setSaveError(null), []);
-  const exportJson = useCallback(() => JSON.stringify({ ...state, exportedAt: new Date().toISOString() }, null, 2), [state]);
+  const exportJson = useCallback(() => JSON.stringify({
+    ...state,
+    customTones: state.customTones.map(({ uri, notificationUri, ...tone }) => ({ ...tone, audioStoredOnThisDevice: true })),
+    exportedAt: new Date().toISOString(),
+  }, null, 2), [state]);
 
   const value = useMemo<HabitStoreValue>(() => ({
     state, hydrated, loadingError, saveError, isOffline, notificationPermission,
     retryLoad, retrySave, askForReminderPermission, refreshReminderPermission,
     finishOnboarding, createHabit, updateHabit, toggleCheckIn, setHabitStatus,
-    deleteHabit, updateSettings, resetProgress, clearError, exportJson,
-  }), [state, hydrated, loadingError, saveError, isOffline, notificationPermission, retryLoad, retrySave, askForReminderPermission, refreshReminderPermission, finishOnboarding, createHabit, updateHabit, toggleCheckIn, setHabitStatus, deleteHabit, updateSettings, resetProgress, clearError, exportJson]);
+    deleteHabit, updateSettings, addCustomTone, removeCustomTone, resetProgress, clearError, exportJson,
+  }), [state, hydrated, loadingError, saveError, isOffline, notificationPermission, retryLoad, retrySave, askForReminderPermission, refreshReminderPermission, finishOnboarding, createHabit, updateHabit, toggleCheckIn, setHabitStatus, deleteHabit, updateSettings, addCustomTone, removeCustomTone, resetProgress, clearError, exportJson]);
 
   return <HabitStoreContext.Provider value={value}>{children}</HabitStoreContext.Provider>;
 }

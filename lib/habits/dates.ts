@@ -17,6 +17,21 @@ export function addDays(key: string, amount: number): string {
   return localDateKey(date);
 }
 
+export const FUTURE_REMINDER_WINDOW_DAYS = 7;
+
+export function getReminderDatesInWindow(
+  startDate: string,
+  frequency: HabitFrequency,
+  windowDays = FUTURE_REMINDER_WINDOW_DAYS,
+): string[] {
+  if (!isValidDateKey(startDate) || !Number.isInteger(windowDays) || windowDays < 1) return [];
+  const reminderDays = frequency === "weekdays" ? new Set([1, 2, 3, 4, 5])
+    : frequency === "threePerWeek" ? new Set([1, 3, 5])
+      : null;
+  return Array.from({ length: windowDays }, (_, offset) => addDays(startDate, offset))
+    .filter((key) => reminderDays === null || reminderDays.has(dateFromKey(key).getDay()));
+}
+
 export function startOfWeek(key: string, weekStartsOnMonday = true): string {
   const date = dateFromKey(key);
   const offset = weekStartsOnMonday ? (date.getDay() + 6) % 7 : date.getDay();

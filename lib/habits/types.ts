@@ -1,6 +1,16 @@
 export type HabitFrequency = "daily" | "weekdays" | "threePerWeek";
 export type HabitStatus = "active" | "paused" | "archived";
 
+export interface CustomReminderTone {
+  id: string;
+  name: string;
+  uri: string;
+  mimeType: string;
+  sizeBytes: number;
+  createdAt: string;
+  notificationUri?: string;
+}
+
 export interface Habit {
   id: string;
   name: string;
@@ -20,6 +30,7 @@ export interface AppSettings {
   reducedMotion: boolean;
   weekStartsOnMonday: boolean;
   remindersEnabled: boolean;
+  reminderToneId: string;
 }
 
 export interface PersistedAppState {
@@ -27,6 +38,7 @@ export interface PersistedAppState {
   onboardingComplete: boolean;
   habits: Habit[];
   settings: AppSettings;
+  customTones: CustomReminderTone[];
 }
 
 export interface HabitDraft {
@@ -43,6 +55,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   reducedMotion: false,
   weekStartsOnMonday: true,
   remindersEnabled: true,
+  reminderToneId: "soft-rise",
 };
 
 export const EMPTY_APP_STATE: PersistedAppState = {
@@ -50,4 +63,5 @@ export const EMPTY_APP_STATE: PersistedAppState = {
   onboardingComplete: false,
   habits: [],
   settings: DEFAULT_SETTINGS,
+  customTones: [],
 };

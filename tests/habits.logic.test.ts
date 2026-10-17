@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, isDueOn, localDateKey, startOfWeek } from "../lib/habits/dates";
+import { addDays, getReminderDatesInWindow, isDueOn, localDateKey, startOfWeek } from "../lib/habits/dates";
 import { completionRateThisWeek, getStreakSummary, getTodayProgressSummary, isCompleteForCurrentPeriod, isHabitDueOnDate, isHabitDueToday } from "../lib/habits/streaks";
 import type { Habit } from "../lib/habits/types";
 
@@ -30,6 +30,18 @@ describe("local habit calendar logic", () => {
   it("skips weekends for a weekday habit", () => {
     expect(isDueOn("weekdays", "2026-10-12")).toBe(true);
     expect(isDueOn("weekdays", "2026-10-17")).toBe(false);
+  });
+
+  it("schedules a bounded first week from a future start date using the habit cadence", () => {
+    expect(getReminderDatesInWindow("2026-10-24", "daily")).toEqual([
+      "2026-10-24", "2026-10-25", "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30",
+    ]);
+    expect(getReminderDatesInWindow("2026-10-24", "weekdays")).toEqual([
+      "2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30",
+    ]);
+    expect(getReminderDatesInWindow("2026-10-24", "threePerWeek")).toEqual([
+      "2026-10-26", "2026-10-28", "2026-10-30",
+    ]);
   });
 
   it("keeps an unfinished daily streak alive during today and resets after a missed due day", () => {
